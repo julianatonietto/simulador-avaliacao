@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Simulador de Comportamentos FIESC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<style>
+/* Layout: barra lateral violeta com as pessoas; área principal com cartões brancos arredondados, valores em linha do tempo */
+:root{
+  --bg:#eceefa; --surface:#ffffff; --fg:#22223a; --muted:#7a7d98; --line:#e3e5f3;
+  --side1:#4f46c8; --side2:#3a2f9e; --side-fg:#ffffff; --side-muted:rgba(255,255,255,.68);
+  --accent:#5a4bdb; --accent-soft:#ecebff;
+  --na:#e0526a; --na-soft:#fde8ec; --ap:#d98a12; --ap-soft:#fdf1dc;
+  --at:#2f8bd8; --at-soft:#e3f1fd; --su:#1fa57a; --su-soft:#ddf6ec;
+  --row1:#f3f2ff; --row2:#fdeff5; --row3:#eef6ff;
+  --shadow:0 6px 24px rgba(60,50,160,.08);
+  --font:"Plus Jakarta Sans",ui-sans-serif,system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#15142a; --surface:#1f1e3a; --fg:#ecebfa; --muted:#a3a3c4; --line:#302f52;
+  --side1:#2f2890; --side2:#211b6b; --side-fg:#ffffff; --side-muted:rgba(255,255,255,.65);
+  --accent:#9d92ff; --accent-soft:#2c2a5a;
+  --na:#ff8a9c; --na-soft:#40223a; --ap:#f2b65a; --ap-soft:#3c3024; --at:#7cbcf2; --at-soft:#1e3150; --su:#5fd6a8; --su-soft:#1b3a36;
+  --row1:#262552; --row2:#33213f; --row3:#1f2d4a; --shadow:0 6px 24px rgba(0,0,0,.3);
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#15142a; --surface:#1f1e3a; --fg:#ecebfa; --muted:#a3a3c4; --line:#302f52;
+  --side1:#2f2890; --side2:#211b6b; --side-fg:#ffffff; --side-muted:rgba(255,255,255,.65);
+  --accent:#9d92ff; --accent-soft:#2c2a5a;
+  --na:#ff8a9c; --na-soft:#40223a; --ap:#f2b65a; --ap-soft:#3c3024; --at:#7cbcf2; --at-soft:#1e3150; --su:#5fd6a8; --su-soft:#1b3a36;
+  --row1:#262552; --row2:#33213f; --row3:#1f2d4a; --shadow:0 6px 24px rgba(0,0,0,.3);
+  color-scheme:dark}
+*{box-sizing:border-box}
+html{font-size:clamp(16px,0.5vw + 8px,21px)}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:.95rem;line-height:1.45;padding-inline:16px;padding-block:1rem 3rem}
+.app{max-width:84rem;margin:0 auto;display:grid;grid-template-columns:17rem minmax(0,1fr);gap:1.25rem;align-items:start}
+h1,h2,h3{margin:0;text-wrap:balance}
+button{font-family:inherit}
+button:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Sidebar */
+.side{position:sticky;top:calc(16px + env(safe-area-inset-top,0px));background:linear-gradient(170deg,var(--side1),var(--side2));color:var(--side-fg);border-radius:24px;padding:24px 14px;display:grid;gap:18px;overflow:hidden}
+.side::after{content:"";position:absolute;width:220px;height:220px;border-radius:50%;right:-90px;bottom:-90px;background:radial-gradient(circle,rgba(255,255,255,.16),transparent 70%);pointer-events:none}
+.brand{padding-inline:10px;display:grid;gap:2px}
+.brand b{font-size:1.15rem;font-weight:800;letter-spacing:.02em}
+.brand span{font-size:.8rem;color:var(--side-muted)}
+.grp{display:grid;gap:4px}
+.grp .gl{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--side-muted);font-weight:700;padding:0 10px 4px}
+.pbtn{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:transparent;color:var(--side-fg);border-radius:14px;padding:8px 10px;cursor:pointer;font-size:.9rem;font-weight:600;transition:background .15s}
+.pbtn:hover{background:rgba(255,255,255,.1)}
+.pbtn[aria-current="true"]{background:var(--surface);color:var(--accent);box-shadow:0 4px 14px rgba(0,0,0,.15)}
+.pbtn .av{flex:none;width:1.9rem;height:1.9rem;border-radius:50%;display:grid;place-items:center;font-size:.72rem;font-weight:800;background:rgba(255,255,255,.18)}
+.pbtn[aria-current="true"] .av{background:var(--accent);color:#fff}
+.pbtn .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pbtn .nm small{display:block;font-size:.7rem;font-weight:500;opacity:.75;line-height:1.2}
+.pbtn .cnt{flex:none;font-size:.72rem;font-weight:800;border-radius:999px;padding:2px 8px;background:rgba(255,255,255,.18);font-variant-numeric:tabular-nums}
+.pbtn[aria-current="true"] .cnt{background:var(--accent-soft);color:var(--accent)}
+.pbtn .cnt.full{background:var(--su);color:#fff}
+
+/* Main */
+.main{display:grid;gap:1.25rem;min-width:0}
+.topbar{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center;background:var(--surface);border-radius:20px;padding:14px 20px;box-shadow:var(--shadow)}
+.topbar h1{font-size:1.35rem;font-weight:800}
+.status{display:inline-flex;align-items:center;gap:8px;font-size:.82rem;color:var(--muted);background:var(--bg);border-radius:999px;padding:6px 12px}
+.status::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--su)}
+.card{background:var(--surface);border-radius:1.4rem;box-shadow:var(--shadow);padding:1.4rem}
+.row2{display:grid;grid-template-columns:minmax(0,1fr) 19rem;gap:1.25rem}
+.profile{display:flex;gap:22px;align-items:center;flex-wrap:wrap}
+.bigav{flex:none;width:6rem;height:6rem;border-radius:50%;display:grid;place-items:center;font-size:1.9rem;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--side1),#b06ad9);box-shadow:0 0 0 6px var(--accent-soft)}
+.pinfo{flex:1;min-width:220px;display:grid;gap:10px}
+.pinfo h2{font-size:1.3rem;font-weight:800}
+.meta{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:.85rem}
+.meta dt{color:var(--muted)} .meta dd{margin:0;font-weight:600;min-width:0;overflow-wrap:anywhere}
+.pills{display:flex;flex-wrap:wrap;gap:6px}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 10px;font-size:.75rem;font-weight:700}
+.p0{background:var(--bg);color:var(--muted)}
+.p1{background:var(--na-soft);color:var(--na)}.p2{background:var(--ap-soft);color:var(--ap)}.p3{background:var(--at-soft);color:var(--at)}.p4{background:var(--su-soft);color:var(--su)}
+.promo{background:linear-gradient(160deg,var(--side1),var(--side2));color:#fff;display:grid;gap:12px;align-content:start;position:relative;overflow:hidden}
+.promo h3{font-size:1.05rem;font-weight:800}
+.promo p{margin:0;font-size:.85rem;color:rgba(255,255,255,.8)}
+.ring{display:flex;align-items:center;gap:14px}
+.ring svg{flex:none}
+.ring b{font-size:1.6rem;font-weight:800;font-variant-numeric:tabular-nums}
+.btn{border:0;border-radius:12px;padding:10px 16px;font-weight:700;font-size:.88rem;cursor:pointer;background:#fff;color:var(--side1)}
+.btn.ghost{background:transparent;color:var(--accent);border:1.5px solid var(--accent)}
+.btn.danger{background:var(--na);color:#fff}
+.copyst{font-size:.8rem;color:rgba(255,255,255,.85);min-height:1em}
+
+/* Legend */
+.legend{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:.8rem;color:var(--muted)}
+
+/* Values timeline */
+.secttl{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px}
+.secttl h2{font-size:1.15rem;font-weight:800}
+.timeline{display:grid;gap:18px;position:relative;padding-left:34px}
+.timeline::before{content:"";position:absolute;left:10px;top:14px;bottom:14px;width:2px;background:var(--line)}
+.value{position:relative;border-radius:18px;background:var(--row1)}
+.value:nth-child(2){background:var(--row2)} .value:nth-child(3){background:var(--row3)} .value:nth-child(4){background:var(--row1)} .value:nth-child(5){background:var(--row2)}
+.dot{position:absolute;left:-32px;top:16px;width:20px;height:20px;border-radius:50%;border:3px solid var(--accent);background:var(--surface)}
+.dot.done{background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+.vhead{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;padding:16px 18px 6px}
+.vhead h3{font-size:1rem;font-weight:800}
+.vhead .calc{font-size:.78rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.toggle{border:0;background:var(--surface);color:var(--accent);width:32px;height:32px;border-radius:50%;cursor:pointer;font-weight:800;display:grid;place-items:center;box-shadow:var(--shadow)}
+.toggle svg{transition:transform .2s}
+.value.closed .toggle svg{transform:rotate(-90deg)}
+.value.closed .body{display:none}
+.vright{display:flex;align-items:center;gap:10px}
+.body{padding:6px 12px 14px;display:grid;gap:6px}
+.beh{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;background:var(--surface);border-radius:14px;padding:10px 12px}
+.beh p{margin:0;font-size:.88rem;min-width:0}
+.scale{display:flex;gap:4px;background:var(--bg);border-radius:999px;padding:3px}
+.scale button{border:0;background:transparent;color:var(--muted);font-size:.75rem;font-weight:800;border-radius:999px;padding:.4rem 0;width:2.5rem;cursor:pointer;transition:background .15s,color .15s}
+.scale button:hover{color:var(--fg);background:var(--surface)}
+.scale button.on[data-v="1"]{background:var(--na);color:#fff}
+.scale button.on[data-v="2"]{background:var(--ap);color:#fff}
+.scale button.on[data-v="3"]{background:var(--at);color:#fff}
+.scale button.on[data-v="4"]{background:var(--su);color:#fff}
+.vfoot{display:grid;grid-template-columns:14.5rem minmax(0,1fr);gap:12px;background:var(--surface);border-radius:14px;padding:12px;margin-top:4px}
+.vfoot label{display:grid;gap:6px;align-content:start}
+.lbl{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700}
+select,textarea{font:inherit;font-size:.88rem;color:var(--fg);background:var(--bg);border:1.5px solid transparent;border-radius:12px;padding:9px 12px;width:100%}
+select:hover,textarea:hover{border-color:var(--line)}
+textarea{min-height:72px;resize:vertical}
+.hint{font-size:.75rem;color:var(--na);font-weight:600}
+.general{display:grid;gap:10px}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.confirm{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:.85rem}
+
+@media (max-width:980px){.row2{grid-template-columns:1fr}}
+@media (max-width:820px){
+  .app{grid-template-columns:1fr}
+  .side{position:relative;top:auto;padding:16px 10px}
+  .grp{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+  .grp .gl{display:none}
+  .pbtn{width:auto;flex:none}
+  .pbtn .nm{max-width:110px}
+  .side .gwrap{display:grid;gap:6px}
+}
+@media (max-width:600px){
+  .beh{grid-template-columns:1fr}
+  .vfoot{grid-template-columns:1fr}
+  .timeline{padding-left:0}.timeline::before,.dot{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<style>[hidden]{display:none!important}body{margin:0}</style>
+</head>
+<body>
+
+<style>
+input[type=text],input[type=email]{font:inherit;font-size:.88rem;color:var(--fg);background:var(--bg);border:1.5px solid transparent;border-radius:12px;padding:9px 12px;width:100%}
+input:hover{border-color:var(--line)}
+input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.addbtn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:1.5px dashed rgba(255,255,255,.45);background:transparent;color:#fff;border-radius:14px;padding:10px;font-weight:700;font-size:.88rem;cursor:pointer}
+.addbtn:hover{background:rgba(255,255,255,.1)}
+.sideempty{font-size:.82rem;color:var(--side-muted);padding:0 10px}
+.form{display:grid;gap:14px}
+.form h2{font-size:1.15rem;font-weight:800}
+.fgrid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,2fr) minmax(0,1fr);gap:12px}
+.fgrid label{display:grid;gap:6px;min-width:0}
+.btn.primary{background:var(--accent);color:#fff}
+.err{font-size:.8rem;color:var(--na);font-weight:600;min-height:1em}
+.empty{display:grid;gap:12px;justify-items:start;padding:36px 28px}
+.empty h2{font-size:1.4rem;font-weight:800}
+.empty p{margin:0;color:var(--muted);max-width:56ch}
+.steps{display:grid;gap:8px;margin:0;padding-left:20px;color:var(--fg)}
+.editrow{display:flex;flex-wrap:wrap;gap:8px}
+.linkbtn{border:0;background:transparent;color:var(--accent);font-weight:700;font-size:.82rem;cursor:pointer;padding:2px 0}
+.backup{display:flex;flex-wrap:wrap;gap:6px;padding:0 4px;position:relative;z-index:1}
+.bkbtn{flex:1;text-align:center;border:0;background:rgba(255,255,255,.14);color:#fff;border-radius:10px;padding:8px 6px;font:inherit;font-size:.78rem;font-weight:700;cursor:pointer}
+.bkbtn:hover{background:rgba(255,255,255,.24)}
+.bkmsg{width:100%;font-size:.75rem;color:var(--side-muted);min-height:1em}
+.clearzone{display:grid;gap:6px;padding:0 4px;position:relative;z-index:1}
+.clearbtn{border:0;background:transparent;color:var(--side-muted);font:inherit;font-size:.78rem;font-weight:700;cursor:pointer;padding:6px;border-radius:10px;text-decoration:underline}
+.clearbtn:hover{color:#fff}
+.clearask{font-size:.78rem;color:#fff;display:grid;gap:6px}
+.clearask div{display:flex;gap:6px}
+.clearask button{flex:1;border:0;border-radius:10px;padding:7px;font:inherit;font-size:.78rem;font-weight:700;cursor:pointer}
+.clearask .yes{background:var(--na);color:#fff}.clearask .no{background:rgba(255,255,255,.18);color:#fff}
+@media (max-width:700px){.fgrid{grid-template-columns:1fr}}
+</style>
+
+<div class="app">
+  <aside class="side">
+    <div class="brand"><b>Avaliação 2026</b><span>Comportamentos · Sistema FIESC</span></div>
+    <div class="gwrap" id="people"></div>
+    <button class="addbtn" id="openAdd">+ Adicionar pessoa</button>
+    <div class="backup">
+      <button class="bkbtn" id="exportBtn">Exportar backup</button>
+      <label class="bkbtn" for="importFile">Importar backup</label>
+      <input type="file" id="importFile" accept="application/json,.json" hidden>
+      <span class="bkmsg" id="bkMsg"></span>
+    </div>
+    <div class="clearzone" id="clearZone"></div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <h1>Simulador de notas</h1>
+      <span class="status" id="status">Carregando…</span>
+    </div>
+
+    <section class="card form" id="formCard" hidden>
+      <h2 id="formTitle">Adicionar pessoa</h2>
+      <div class="fgrid">
+        <label><span class="lbl">Nome</span><input type="text" id="fName" autocomplete="off" placeholder="Nome de quem será avaliado"></label>
+        <label><span class="lbl">E-mail (opcional)</span><input type="email" id="fMail" autocomplete="off" placeholder="nome@sc.senai.br"></label>
+        <label><span class="lbl">Tipo</span><select id="fType"><option>Liderado</option><option>Pares</option><option>Autoavaliação</option><option>Gestor</option></select></label>
+      </div>
+      <div class="actions"><button class="btn primary" id="fSave">Salvar</button><button class="btn ghost" id="fCancel">Cancelar</button><span class="err" id="fErr"></span></div>
+    </section>
+
+    <section class="card empty" id="emptyCard" hidden>
+      <h2>Comece adicionando quem você vai avaliar</h2>
+      <p>Cada pessoa ganha uma ficha com os 5 valores e seus comportamentos. Suas notas e anotações ficam salvas só neste navegador, neste computador. Use "Exportar backup" de vez em quando para não perder nada.</p>
+      <ol class="steps">
+        <li>Adicione as pessoas com nome e tipo de avaliação.</li>
+        <li>Marque cada comportamento na escala NA, AP, A ou S.</li>
+        <li>Confira a nota sugerida de cada valor e ajuste se quiser.</li>
+        <li>Use "Copiar resumo" para levar tudo para o sistema.</li>
+      </ol>
+      <button class="btn primary" id="emptyAdd">+ Adicionar pessoa</button>
+    </section>
+
+    <div id="evalArea" hidden style="display:grid;gap:20px">
+      <div class="row2">
+        <section class="card profile">
+          <div class="bigav" id="bigav"></div>
+          <div class="pinfo">
+            <h2 id="pname"></h2>
+            <dl class="meta"><dt>E-mail</dt><dd id="pmail"></dd><dt>Tipo</dt><dd id="ptype"></dd></dl>
+            <div class="pills" id="summary"></div>
+            <div class="editrow" id="editZone"></div>
+          </div>
+        </section>
+        <section class="card promo">
+          <h3>Progresso</h3>
+          <div class="ring" id="ring"></div>
+          <p>Copie um resumo com as notas e anotações desta pessoa.</p>
+          <button class="btn" id="copy">Copiar resumo</button>
+          <span class="copyst" id="copyStatus"></span>
+        </section>
+      </div>
+
+      <section class="card">
+        <div class="secttl">
+          <h2>Valores e comportamentos</h2>
+          <div class="legend">
+            <span class="pill p1">NA · Não Atende</span><span class="pill p2">AP · Atende Parcialmente</span><span class="pill p3">A · Atende</span><span class="pill p4">S · Supera</span>
+          </div>
+        </div>
+        <div class="timeline" id="values"></div>
+      </section>
+
+      <section class="card general">
+        <label for="geral" class="lbl">Comentário geral e recomendações para o próximo ciclo</label>
+        <textarea id="geral" placeholder="Principais pontos fortes, evolução no ciclo e recomendações"></textarea>
+        <div class="actions"><span id="resetZone"></span></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+const VALUES=[
+ {id:"v1",name:"Uma só FIESC",b:[
+  "Promovo a integração por meio de uma linguagem e uma postura colaborativas, eliminando ativamente a visão de \"nós contra eles\"",
+  "Tenho visão sistêmica e avalio como as minhas decisões podem impactar outras áreas e o todo antes de agir",
+  "Trabalho em parceria com outras áreas para solucionar problemas de ponta a ponta, garantindo que a demanda seja resolvida para além do meu time",
+  "Compartilho informações relevantes com outras áreas de forma proativa",
+  "Conecto pessoas e áreas quando identifico oportunidades de sinergia",
+  "Sou cordial, respeitoso e pratico a gentileza com todos os colegas no meu dia a dia, sem distinção",
+  "Comemoro e me sinto parte dos avanços da FIESC como um todo, valorizando as vitórias coletivas tanto quanto as da minha própria área"]},
+ {id:"v2",name:"Gente que faz a indústria",b:[
+  "Sou responsável pelo meu desenvolvimento de carreira e me mantenho atualizado para os desafios atuais e futuros",
+  "Contribuo para um ambiente seguro, inclusivo e de valorização das diferenças, onde todos se sentem ouvidos e respeitados",
+  "Zelo pela saúde física e mental minha e de meus colegas",
+  "Sou guardião da segurança, cumpro rigorosamente as normas e práticas que garantem a integridade física e emocional de todos",
+  "Compartilho conhecimento para desenvolver outras pessoas e fortalecer os times",
+  "Peço e ofereço feedbacks de forma construtiva e frequente",
+  "Reconheço e celebro as contribuições e resultados das pessoas"]},
+ {id:"v3",name:"Menos trava mais entrega",b:[
+  "Questiono burocracias e exponho gargalos que dificultam a entrega de resultados",
+  "Elimino etapas desnecessárias e simplifico o trabalho sempre que identifico oportunidades",
+  "Testo soluções na prática e não espero condições ideais para agir",
+  "Vejo os erros como oportunidade de aprendizado",
+  "Resolvo com a urgência necessária e melhoro depois",
+  "Foco em resolver problemas e destravar entregas, sem perder tempo procurando culpados",
+  "Abraço novas tecnologias e mudanças de rota como parte do crescimento"]},
+ {id:"v4",name:"Protagonismo responsável",b:[
+  "Conheço as metas e os objetivos da FIESC, e sei como meu trabalho contribui para os resultados da companhia",
+  "Sou proativo e não espero por direcionamentos constantes para realizar o que precisa ser feito",
+  "Uso minha autonomia com base no meu nível de responsabilidade, conhecimento e segurança para tomar decisões",
+  "Assumo a responsabilidade pelos resultados das minhas entregas",
+  "Cumpro meus prazos com qualidade e honro meus combinados",
+  "Resolvo o que está ao meu alcance sem transferir a responsabilidade",
+  "Sustento decisões com dados, contexto e responsabilidade pelo impacto gerado"]},
+ {id:"v5",name:"Legado que transforma",b:[
+  "Conecto minhas entregas ao propósito e à estratégia da FIESC",
+  "Entendo profundamente as necessidades do cliente antes de propor soluções",
+  "Ajusto soluções com base em feedbacks de clientes e parceiros",
+  "Priorizo atividades que geram impacto real para o cliente e para a indústria",
+  "Avalio o impacto das minhas ações no curto, médio e longo prazo",
+  "Considero o contexto além da minha área e função para construir soluções mais completas e evitar abordagens superficiais",
+  "Resolvo a causa dos problemas, não apenas seus efeitos"]}
+];
+const TYPES=["Liderado","Pares","Autoavaliação","Gestor"];
+const SCALE={1:["NA","Não Atende"],2:["AP","Atende Parcialmente"],3:["A","Atende"],4:["S","Supera"]};
+const blank=()=>({scores:{},final:{},notes:{},geral:""});
+const LS="simulador_equipe_v1";
+
+let state={people:[],evals:{}}, current=null, db=null, docRef=null, saveTimer=null, closed={}, editing=null;
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
+const initials=n=>{const w=n.trim().split(/\s+/).filter(x=>x.length>2);const a=(w.length?w:n.trim().split(/\s+/));return ((a[0]||"")[0]||"").concat((a[1]||"")[0]||"").toUpperCase()||"?";};
+const firstName=n=>n.trim().split(/\s+/)[0]||n;
+const ev=pid=>state.evals[pid]||(state.evals[pid]=blank());
+function avg(pid,v){const s=ev(pid).scores;const xs=v.b.map((_,i)=>s[v.id+"_"+i]).filter(Boolean);if(!xs.length)return null;return xs.reduce((a,b)=>a+b,0)/xs.length;}
+function bucket(a){if(a==null)return 0;if(a<=1.5)return 1;if(a<=2.5)return 2;if(a<=3.5)return 3;return 4;}
+function result(pid,v){const f=ev(pid).final[v.id];return f?+f:bucket(avg(pid,v));}
+const doneCount=pid=>VALUES.filter(v=>result(pid,v)).length;
+const fmt=n=>n.toFixed(2).replace(".",",");
+
+function renderPeople(){
+  const nav=$("#people");nav.innerHTML="";
+  if(!state.people.length){nav.innerHTML=`<p class="sideempty">Ninguém adicionado ainda.</p>`;return;}
+  TYPES.forEach(t=>{
+    const list=state.people.filter(p=>p.type===t);if(!list.length)return;
+    const d=document.createElement("div");d.className="grp";d.innerHTML=`<span class="gl">${t}</span>`;
+    list.forEach(p=>{
+      const n=doneCount(p.id);
+      const b=document.createElement("button");b.className="pbtn";b.setAttribute("aria-current",p.id===current);
+      b.innerHTML=`<span class="av">${esc(initials(p.name))}</span><span class="nm">${esc(firstName(p.name))}<small>${esc(p.type)}</small></span><span class="cnt ${n===5?"full":""}">${n}/5</span>`;
+      b.onclick=()=>{current=p.id;closeForm();render();window.scrollTo({top:0});};
+      d.appendChild(b);
+    });
+    nav.appendChild(d);
+  });
+}
+function renderHeader(){
+  const p=state.people.find(x=>x.id===current);
+  $("#bigav").textContent=initials(p.name);
+  $("#pname").textContent=p.name;$("#pmail").textContent=p.email||"—";$("#ptype").textContent=p.type;
+  $("#summary").innerHTML=VALUES.map((v,i)=>{const r=result(current,v);return `<span class="pill p${r}">${i+1}. ${v.name}: ${r?SCALE[r][0]:"–"}</span>`}).join("");
+  const n=doneCount(current),C=2*Math.PI*26,off=C*(1-n/5);
+  $("#ring").innerHTML=`<svg style="width:4rem;height:4rem" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="26" fill="none" stroke="rgba(255,255,255,.2)" stroke-width="7"/><circle cx="32" cy="32" r="26" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${off}" transform="rotate(-90 32 32)"/></svg><div><b>${n}/5</b><p>valores com nota</p></div>`;
+  editZoneIdle();
+}
+function editZoneIdle(){
+  $("#editZone").innerHTML=`<button class="linkbtn" id="editP">Editar dados</button><button class="linkbtn" id="delP">Remover pessoa</button>`;
+  $("#editP").onclick=()=>openForm(current);
+  $("#delP").onclick=()=>{
+    $("#editZone").innerHTML=`<span class="confirm">Remover esta pessoa e todas as notas dela? <button class="btn danger" id="delYes">Remover</button><button class="btn ghost" id="delNo">Cancelar</button></span>`;
+    $("#delNo").onclick=editZoneIdle;
+    $("#delYes").onclick=()=>{state.people=state.people.filter(p=>p.id!==current);delete state.evals[current];current=state.people[0]?state.people[0].id:null;save(0);render();};
+  };
+}
+function renderValues(){
+  const box=$("#values");box.innerHTML="";const st=ev(current);
+  VALUES.forEach((v,vi)=>{
+    const sec=document.createElement("section");sec.className="value"+(closed[v.id]?" closed":"");
+    const a=avg(current,v);const n=v.b.filter((_,i)=>st.scores[v.id+"_"+i]).length;const r=result(current,v);
+    sec.innerHTML=`<span class="dot ${r?"done":""}"></span><div class="vhead"><div><h3>${vi+1}. ${v.name}</h3>
+      <span class="calc">${n}/${v.b.length} marcados${a!=null?` · média ${fmt(a)}`:""}</span></div>
+      <div class="vright"><span class="pill p${r}">${r?SCALE[r][1]:"Sem nota"}</span>
+      <button class="toggle" aria-label="Mostrar ou esconder" aria-expanded="${!closed[v.id]}"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 5l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div></div>`;
+    sec.querySelector(".toggle").onclick=()=>{closed[v.id]=!closed[v.id];sec.classList.toggle("closed");};
+    const body=document.createElement("div");body.className="body";
+    v.b.forEach((t,i)=>{
+      const k=v.id+"_"+i;const row=document.createElement("div");row.className="beh";
+      row.innerHTML=`<p>${esc(t)}</p><div class="scale" role="group" aria-label="Escala">${[1,2,3,4].map(s=>`<button data-v="${s}" title="${SCALE[s][1]}" aria-pressed="${st.scores[k]===s}" class="${st.scores[k]===s?"on":""}">${SCALE[s][0]}</button>`).join("")}</div>`;
+      row.querySelectorAll("button").forEach(btn=>btn.onclick=()=>{
+        const s=+btn.dataset.v; if(st.scores[k]===s) delete st.scores[k]; else st.scores[k]=s;
+        save(0); render(true);
+      });
+      body.appendChild(row);
+    });
+    const sug=bucket(a);const fin=st.final[v.id];const eff=fin||sug;
+    const foot=document.createElement("div");foot.className="vfoot";
+    foot.innerHTML=`<label><span class="lbl">Nota final do valor</span>
+      <select id="final_${v.id}"><option value="">${sug?"Usar sugerida ("+SCALE[sug][1]+")":"Usar sugerida"}</option>${[4,3,2,1].map(s=>`<option value="${s}" ${fin==s?"selected":""}>${SCALE[s][1]}</option>`).join("")}</select>
+      ${eff==4||eff==1?'<span class="hint">Comentário obrigatório no sistema</span>':""}</label>
+      <label><span class="lbl">Anotações sobre este valor</span><textarea id="notes_${v.id}" placeholder="Exemplos e situações que justificam a nota">${esc(st.notes[v.id]||"")}</textarea></label>`;
+    foot.querySelector("select").onchange=e=>{const x=e.target.value;if(x)st.final[v.id]=+x;else delete st.final[v.id];save(0);render(true);};
+    foot.querySelector("textarea").oninput=e=>{st.notes[v.id]=e.target.value;save(800);};
+    body.appendChild(foot);sec.appendChild(body);box.appendChild(sec);
+  });
+}
+function render(keepScroll){
+  const y=window.scrollY;
+  renderPeople();
+  const has=!!current&&state.people.some(p=>p.id===current);
+  $("#evalArea").hidden=!has;
+  $("#emptyCard").hidden=has||!$("#formCard").hidden;
+  if(has){renderHeader();renderValues();$("#geral").value=ev(current).geral||"";restoreReset();}
+  if(keepScroll) window.scrollTo(0,y);
+}
+$("#geral").oninput=e=>{ev(current).geral=e.target.value;save(800);};
+
+/* Formulário */
+function openForm(pid){
+  editing=pid||null;const p=pid?state.people.find(x=>x.id===pid):null;
+  $("#formTitle").textContent=p?"Editar dados":"Adicionar pessoa";
+  $("#fName").value=p?p.name:"";$("#fMail").value=p?(p.email||""):"";$("#fType").value=p?p.type:"Liderado";$("#fErr").textContent="";
+  $("#formCard").hidden=false;$("#emptyCard").hidden=true;$("#fName").focus();window.scrollTo({top:0});
+}
+function closeForm(){$("#formCard").hidden=true;editing=null;}
+$("#openAdd").onclick=()=>openForm();
+$("#emptyAdd").onclick=()=>openForm();
+$("#fCancel").onclick=()=>{closeForm();render();};
+$("#fSave").onclick=()=>{
+  const name=$("#fName").value.trim();if(!name){$("#fErr").textContent="Informe o nome da pessoa.";$("#fName").focus();return;}
+  const data={name,email:$("#fMail").value.trim(),type:$("#fType").value};
+  if(editing){Object.assign(state.people.find(p=>p.id===editing),data);current=editing;}
+  else{const id="p"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);state.people.push({id,...data});state.evals[id]=blank();current=id;}
+  closeForm();save(0);render();
+};
+$("#fName").addEventListener("keydown",e=>{if(e.key==="Enter")$("#fSave").click();});
+
+/* Salvamento */
+function setStatus(t){$("#status").textContent=t;}
+function save(delay){
+  setStatus("Salvando…");clearTimeout(saveTimer);
+  saveTimer=setTimeout(async()=>{
+    const data=JSON.parse(JSON.stringify(state));data.updatedAt=new Date().toISOString();
+    try{localStorage.setItem(LS,JSON.stringify(data))}catch(e){}
+    try{localStorage.setItem(LS+"_tab",current||"")}catch(e){}
+    setStatus("Salvo neste navegador");
+  },delay);
+}
+function readSnap(s){if(!s)return null;if(typeof s.data==="function")return s.data();if(s.data&&typeof s.data==="object")return s.data;if(s.exists===false)return null;return s;}
+function load(d){if(!d||!Array.isArray(d.people))return false;state={people:d.people,evals:d.evals||{}};return true;}
+
+function restoreReset(){
+  $("#resetZone").innerHTML=`<button class="btn ghost" id="reset">Limpar notas desta pessoa</button>`;
+  $("#reset").onclick=()=>{
+    $("#resetZone").innerHTML=`<span class="confirm">Apagar notas e anotações desta pessoa? <button class="btn danger" id="yes">Apagar</button><button class="btn ghost" id="no">Cancelar</button></span>`;
+    $("#no").onclick=restoreReset;
+    $("#yes").onclick=()=>{state.evals[current]=blank();save(0);render(true);};
+  };
+}
+
+$("#copy").onclick=()=>{
+  const p=state.people.find(x=>x.id===current);const st=ev(current);
+  let t=`AVALIAÇÃO DE COMPORTAMENTOS 2026 — ${p.name} (${p.type})\n\n`;
+  VALUES.forEach((v,i)=>{const r=result(current,v);
+    t+=`${i+1}. ${v.name.toUpperCase()}: ${r?SCALE[r][1]:"sem nota"}\n`;
+    v.b.forEach((b,j)=>{const s=st.scores[v.id+"_"+j];if(s)t+=`   [${SCALE[s][0]}] ${b}\n`;});
+    if(st.notes[v.id])t+=`   Anotações: ${st.notes[v.id]}\n`;t+="\n";});
+  if(st.geral)t+=`COMENTÁRIO GERAL: ${st.geral}\n`;
+  const ok=()=>{$("#copyStatus").textContent="Resumo copiado.";};
+  const fb=()=>{const ta=document.createElement("textarea");ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand("copy");ok();}catch(e){$("#copyStatus").textContent="Não deu para copiar.";}ta.remove();};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(ok).catch(fb);}else fb();
+};
+
+/* Início */
+try{const r=localStorage.getItem(LS);if(r)load(JSON.parse(r));}catch(e){}
+try{const t=localStorage.getItem(LS+"_tab");if(t&&state.people.some(p=>p.id===t))current=t;}catch(e){}
+if(!current&&state.people[0])current=state.people[0].id;
+render();setStatus("Salvo neste navegador");
+
+
+
+/* Backup */
+$("#exportBtn").onclick=()=>{
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);
+  a.download="avaliacao-comportamentos-"+new Date().toISOString().slice(0,10)+".json";
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  $("#bkMsg").textContent="Backup baixado.";
+};
+$("#importFile").onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{try{const d=JSON.parse(r.result);if(!load(d))throw 0;current=state.people[0]?state.people[0].id:null;save(0);render();$("#bkMsg").textContent="Backup importado.";}
+    catch(err){$("#bkMsg").textContent="Arquivo inválido. Use um backup exportado por aqui.";}
+    e.target.value="";};
+  r.readAsText(f);
+};
+
+/* Limpar tudo */
+function clearIdle(){
+  $("#clearZone").innerHTML=`<button class="clearbtn" id="clearAll">Limpar tudo</button>`;
+  $("#clearAll").onclick=()=>{
+    $("#clearZone").innerHTML=`<div class="clearask">Apagar todas as pessoas, notas e anotações? Não dá para desfazer.<div><button class="yes" id="clearYes">Apagar tudo</button><button class="no" id="clearNo">Cancelar</button></div></div>`;
+    $("#clearNo").onclick=clearIdle;
+    $("#clearYes").onclick=()=>{state={people:[],evals:{}};current=null;closeForm();save(0);render();clearIdle();};
+  };
+}
+clearIdle();
+</script>
+
+</body>
+</html>
