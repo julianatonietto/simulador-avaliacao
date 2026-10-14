@@ -334,7 +334,7 @@ function renderPeople(){
       const n=doneCount(p.id);
       const b=document.createElement("button");b.className="pbtn";b.setAttribute("aria-current",p.id===current);
       b.innerHTML=`<span class="av">${esc(initials(p.name))}</span><span class="nm">${esc(firstName(p.name))}<small>${esc(p.type)}</small></span><span class="cnt ${n===5?"full":""}">${n}/5</span>`;
-      b.onclick=()=>{current=p.id;closeForm();render();window.scrollTo({top:0});};
+      b.onclick=()=>{syncFromScreen();save(0);current=p.id;closeForm();render();window.scrollTo({top:0});};
       d.appendChild(b);
     });
     nav.appendChild(d);
@@ -355,7 +355,7 @@ function editZoneIdle(){
   $("#delP").onclick=()=>{
     $("#editZone").innerHTML=`<span class="confirm">Remover esta pessoa e todas as notas dela? <button class="btn danger" id="delYes">Remover</button><button class="btn ghost" id="delNo">Cancelar</button></span>`;
     $("#delNo").onclick=editZoneIdle;
-    $("#delYes").onclick=()=>{state.people=state.people.filter(p=>p.id!==current);delete state.evals[current];current=state.people[0]?state.people[0].id:null;save(0);render();};
+    $("#delYes").onclick=()=>{(state.removed=state.removed||[]).push(current);state.people=state.people.filter(p=>p.id!==current);delete state.evals[current];current=state.people[0]?state.people[0].id:null;save(0);render();};
   };
 }
 function renderValues(){
@@ -373,7 +373,7 @@ function renderValues(){
       const k=v.id+"_"+i;const row=document.createElement("div");row.className="beh";
       row.innerHTML=`<p>${esc(t)}</p><div class="scale" role="group" aria-label="Escala">${[1,2,3,4].map(s=>`<button data-v="${s}" title="${SCALE[s][1]}" aria-pressed="${st.scores[k]===s}" class="${st.scores[k]===s?"on":""}">${SCALE[s][0]}</button>`).join("")}</div>`;
       row.querySelectorAll("button").forEach(btn=>btn.onclick=()=>{
-        const s=+btn.dataset.v; if(st.scores[k]===s) delete st.scores[k]; else st.scores[k]=s;
+        syncFromScreen();const s=+btn.dataset.v; if(st.scores[k]===s) delete st.scores[k]; else st.scores[k]=s;
         save(0); render(true);
       });
       body.appendChild(row);
@@ -425,6 +425,7 @@ function setStatus(t){$("#status").textContent=t;}
 function save(delay){
   setStatus("Salvando…");clearTimeout(saveTimer);
   saveTimer=setTimeout(async()=>{
+    syncFromScreen();state.updatedAt=new Date().toISOString();
     const data=JSON.parse(JSON.stringify(state));data.updatedAt=new Date().toISOString();
     try{localStorage.setItem(LS,JSON.stringify(data))}catch(e){}
     try{localStorage.setItem(LS+"_tab",current||"")}catch(e){}
@@ -432,18 +433,39 @@ function save(delay){
   },delay);
 }
 function readSnap(s){if(!s)return null;if(typeof s.data==="function")return s.data();if(s.data&&typeof s.data==="object")return s.data;if(s.exists===false)return null;return s;}
-function load(d){if(!d||!Array.isArray(d.people))return false;state={people:d.people,evals:d.evals||{}};return true;}
+function load(d){if(!d||!Array.isArray(d.people))return false;state={people:d.people,evals:d.evals||{},removed:d.removed||[],clearedAt:d.clearedAt||"",updatedAt:d.updatedAt||""};return true;}
+/* Garante que o que está escrito na tela é o que vai ser salvo */
+function syncFromScreen(){
+  if(!current||!state.people.some(p=>p.id===current))return;const st=ev(current);
+  VALUES.forEach(v=>{const el=document.getElementById("notes_"+v.id);if(el&&el.value!==(st.notes[v.id]||""))st.notes[v.id]=el.value;});
+  const g=document.getElementById("geral");if(g&&!$("#evalArea").hidden&&g.value!==(st.geral||""))st.geral=g.value;
+}
+document.addEventListener("change",e=>{if(e.target.tagName==="TEXTAREA"&&e.target.id!=="fName"){syncFromScreen();save(0);}});
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden"){syncFromScreen();save(0);}});
+const ts=x=>Date.parse(x||"")||0;
+function mergeLocal(L){
+  const R=state;if(!L||!L.people||!L.people.length)return false;
+  if(ts(R.clearedAt)>ts(L.updatedAt))return false;
+  let ch=false;const rem=new Set(R.removed||[]);
+  L.people.forEach(p=>{if(rem.has(p.id))return;if(!R.people.some(q=>q.id===p.id)){R.people.push(p);R.evals[p.id]=L.evals[p.id]||blank();ch=true;}});
+  for(const pid in L.evals){const le=L.evals[pid],re=R.evals[pid];if(!le||!re)continue;if(ts(re.resetAt)>ts(L.updatedAt))continue;
+    re.notes=re.notes||{};for(const k in (le.notes||{})){if(le.notes[k]&&!re.notes[k]){re.notes[k]=le.notes[k];ch=true;}}
+    if(le.geral&&!re.geral){re.geral=le.geral;ch=true;}}
+  return ch;
+}
+
 
 function restoreReset(){
   $("#resetZone").innerHTML=`<button class="btn ghost" id="reset">Limpar notas desta pessoa</button>`;
   $("#reset").onclick=()=>{
     $("#resetZone").innerHTML=`<span class="confirm">Apagar notas e anotações desta pessoa? <button class="btn danger" id="yes">Apagar</button><button class="btn ghost" id="no">Cancelar</button></span>`;
     $("#no").onclick=restoreReset;
-    $("#yes").onclick=()=>{state.evals[current]=blank();save(0);render(true);};
+    $("#yes").onclick=()=>{state.evals[current]=Object.assign(blank(),{resetAt:new Date().toISOString()});save(0);render(true);};
   };
 }
 
 $("#copy").onclick=()=>{
+  syncFromScreen();save(0);
   const p=state.people.find(x=>x.id===current);const st=ev(current);
   let t=`AVALIAÇÃO DE COMPORTAMENTOS 2026 — ${p.name} (${p.type})\n\n`;
   VALUES.forEach((v,i)=>{const r=result(current,v);
@@ -487,7 +509,7 @@ function clearIdle(){
   $("#clearAll").onclick=()=>{
     $("#clearZone").innerHTML=`<div class="clearask">Apagar todas as pessoas, notas e anotações? Não dá para desfazer.<div><button class="yes" id="clearYes">Apagar tudo</button><button class="no" id="clearNo">Cancelar</button></div></div>`;
     $("#clearNo").onclick=clearIdle;
-    $("#clearYes").onclick=()=>{state={people:[],evals:{}};current=null;closeForm();save(0);render();clearIdle();};
+    $("#clearYes").onclick=()=>{state={people:[],evals:{},removed:[],clearedAt:new Date().toISOString()};current=null;closeForm();save(0);render();clearIdle();};
   };
 }
 clearIdle();
